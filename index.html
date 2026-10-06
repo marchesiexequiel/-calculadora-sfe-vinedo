@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora SFE Viñedo</title>
+<style>
+:root{--bg:#f6f6f7;--card:#fff;--text:#111;--muted:#6b6b70;--border:#dddddf;--panel:#f0f0f2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+main{max-width:760px;margin:0 auto;padding:12px}.card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:15px;margin-bottom:12px}
+h1{font-size:23px;margin:0 0 12px}h2{font-size:18px;margin:0 0 10px}.grid{display:grid;gap:12px}.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+label{display:block;font-size:14px;font-weight:600}select,input[type=number]{width:100%;margin-top:6px;min-height:46px;border:1px solid var(--border);border-radius:15px;background:white;padding:0 13px;font-size:16px}
+.note{background:var(--panel);border-radius:15px;padding:12px;color:var(--muted);font-size:13px;line-height:1.4}.result{background:var(--panel)}
+.result-label{font-size:13px;color:var(--muted);font-weight:600}.amount{font-size:44px;font-weight:800;line-height:1;margin:5px 0 7px;font-variant-numeric:tabular-nums}
+.sub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:16px}
+.metric{border:1px solid var(--border);border-radius:15px;padding:12px;min-width:0}.metric small{display:block;color:var(--muted);font-size:11px}
+.metric strong{display:block;margin-top:3px;font-size:18px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.slider-block{padding:7px 0 16px}.slider-block+.slider-block{border-top:1px solid var(--border);padding-top:20px}
+.slider-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.slider-title{font-size:16px;line-height:1.2;font-weight:650;min-width:0}
+.slider-value{white-space:nowrap;font-size:25px;line-height:1;font-weight:760;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:34px;margin:18px 0 0;accent-color:#111}
+details{margin-top:12px;border:1px solid var(--border);border-radius:15px;padding:12px}summary{font-weight:700;cursor:pointer}
+button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;color:#fff;font-weight:700;font-size:15px;margin-top:12px}
+.footer{font-size:11px;color:var(--muted);line-height:1.4;margin-top:10px}
+@media(max-width:520px){.grid2{grid-template-columns:1fr}.slider-title{font-size:15px}.slider-value{font-size:23px}.amount{font-size:42px}}
+@media(max-width:360px){.slider-title{font-size:14px}.slider-value{font-size:21px}.amount{font-size:38px}.metrics{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Calculadora SFE Viñedo</h1>
+
+<section class="card">
+<div class="grid grid2">
+<label>Sistema de conducción
+<select id="system"><option value="espaldera">Espaldera</option><option value="lira">Lira</option></select>
+</label>
+<label>Superficie del lote (ha)
+<input id="area" type="number" min="0.01" step="0.01" value="0.30" inputmode="decimal">
+</label>
+</div>
+</section>
+
+<section class="card">
+<h2>Fitosanitario</h2>
+<div class="grid">
+<label>Producto
+<select id="preset">
+<option value="kumulus">Kumulus DF · Azufre 80%</option>
+<option value="captan">Merpan / Captan 83%</option>
+<option value="curzate">Curzate M8</option>
+<option value="copper">Oxicloruro de cobre 84–85%</option>
+<option value="coprantol">Coprantol Duo</option>
+<option value="comet">Comet</option>
+<option value="serenade">Serenade ASO</option>
+<option value="spyra">Basfoliar Spyra SL</option>
+<option value="custom">Otro / personalizado</option>
+</select>
+</label>
+<div class="grid grid2">
+<label>Tipo de dosis
+<select id="doseType"><option value="per100">por 100 L</option><option value="perha">por ha</option></select>
+</label>
+<label>Unidad
+<select id="unit"><option value="g">g</option><option value="mL">mL</option></select>
+</label>
+</div>
+<label>Dosis de referencia
+<input id="dose" type="number" min="0" step="1" value="100" inputmode="decimal">
+</label>
+<div id="productNote" class="note">Valor inicial de trabajo: 100 g/100 L. Confirmar siempre la formulación y el marbete vigente.</div>
+</div>
+</section>
+
+<section class="card result">
+<div class="result-label">Cantidad a colocar en el tanque</div>
+<div id="amount" class="amount">96 g</div>
+<div id="resultSub" class="sub">Kumulus DF · 40 L · 0,30 ha</div>
+<div class="metrics">
+<div class="metric"><small>SFE / ha</small><strong id="sfe">3.200 m²</strong></div>
+<div class="metric"><small>Volumen</small><strong id="lha">133,3 L/ha</strong></div>
+</div>
+</section>
+
+<section class="card">
+<div class="slider-block">
+<div class="slider-head"><div class="slider-title">Distancia entre hileras</div><div id="spacingValue" class="slider-value">2,50 m</div></div>
+<input id="spacing" type="range" min="1.50" max="4.00" step="0.05" value="2.50">
+</div>
+<div class="slider-block">
+<div class="slider-head"><div class="slider-title">Altura efectiva del follaje</div><div id="heightValue" class="slider-value">40 cm</div></div>
+<input id="height" type="range" min="10" max="150" step="5" value="40">
+</div>
+<div class="slider-block">
+<div class="slider-head"><div id="waterTitle" class="slider-title">Agua para las 0,30 ha</div><div id="waterValue" class="slider-value">40 L</div></div>
+<input id="water" type="range" min="10" max="150" step="1" value="40">
+</div>
+</section>
+
+<section class="card">
+<details>
+<summary>Ver detalle del cálculo</summary>
+<div class="metrics">
+<div class="metric"><small>Factor SFE</small><strong id="fsfe">0,320</strong></div>
+<div class="metric"><small>Factor concentración</small><strong id="fwater">7,50</strong></div>
+</div>
+<div id="calcDetail" class="sub" style="margin-top:10px"></div>
+</details>
+<button id="reset" type="button">Restablecer ejemplo</button>
+<div class="footer">Prototipo para revisión técnica. Las dosis precargadas son valores de trabajo y deben verificarse contra el marbete vigente, formulación, cultivo autorizado y límites por hectárea.</div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=(v,d=2)=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:d}).format(v);
+const products={
+kumulus:{name:'Kumulus DF',dose:100,unit:'g',type:'per100',note:'Valor inicial de trabajo: 100 g/100 L. Confirmar siempre la formulación y el marbete vigente.'},
+captan:{name:'Merpan / Captan 83%',dose:180,unit:'g',type:'per100',note:'Valor inicial de trabajo: 180 g/100 L. Confirmar formulación y marbete.'},
+curzate:{name:'Curzate M8',dose:250,unit:'g',type:'per100',note:'Se muestra 250 g/100 L como valor de trabajo. Revisar el rango exacto indicado en tu envase.'},
+copper:{name:'Oxicloruro de cobre 84–85%',dose:350,unit:'g',type:'per100',note:'Se muestra 350 g/100 L como valor de trabajo. Ajustar según formulación y marbete.'},
+coprantol:{name:'Coprantol Duo',dose:'',unit:'g',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete exacto.'},
+comet:{name:'Comet',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete para vid.'},
+serenade:{name:'Serenade ASO',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete.'},
+spyra:{name:'Basfoliar Spyra SL',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete.'},
+custom:{name:'Producto personalizado',dose:'',unit:'g',type:'per100',note:'Ingresá manualmente la dosis de referencia del producto.'}
+};
+let currentName='Kumulus DF';
+function n(id,f){const x=Number(String($(id).value).replace(',','.'));return Number.isFinite(x)&&x>0?x:f}
+function loadPreset(){const p=products[$('preset').value];currentName=p.name;$('dose').value=p.dose;$('unit').value=p.unit;$('doseType').value=p.type;$('productNote').textContent=p.note;calculate()}
+function calculate(){
+const area=n('area',.30),spacing=n('spacing',2.5),hCm=n('height',40),h=hCm/100,water=n('water',40),faces=$('system').value==='lira'?4:2;
+$('spacingValue').textContent=fmt(spacing,2)+' m';$('heightValue').textContent=fmt(hCm,0)+' cm';$('waterValue').textContent=fmt(water,0)+' L';$('waterTitle').textContent='Agua para las '+fmt(area,2)+' ha';
+const sfe=(10000/spacing)*h*faces,fSFE=sfe/10000,lha=water/area,fWater=1000/lha;
+const dose=Number(String($('dose').value).replace(',','.')),valid=Number.isFinite(dose)&&dose>0,unit=$('unit').value,type=$('doseType').value;
+let amount=null;if(valid)amount=type==='per100'?dose*fSFE*fWater*(water/100):dose*area*fSFE;
+$('amount').textContent=amount===null?'—':fmt(amount,1)+' '+unit;
+$('resultSub').textContent=currentName+' · '+fmt(water,0)+' L · '+fmt(area,2)+' ha';
+$('sfe').textContent=fmt(sfe,0)+' m²';$('fsfe').textContent=fmt(fSFE,3);$('lha').textContent=fmt(lha,1)+' L/ha';$('fwater').textContent=fmt(fWater,2);
+$('calcDetail').innerHTML='<p><strong>SFE:</strong> (10.000 / '+fmt(spacing,2)+') × '+fmt(h,2)+' × '+faces+' = '+fmt(sfe,0)+' m²/ha</p><p><strong>Factor SFE:</strong> '+fmt(sfe,0)+' / 10.000 = '+fmt(fSFE,3)+'</p><p><strong>Volumen:</strong> '+fmt(water,0)+' L / '+fmt(area,2)+' ha = '+fmt(lha,1)+' L/ha</p><p><strong>Factor concentración:</strong> 1.000 / '+fmt(lha,1)+' = '+fmt(fWater,2)+'</p>';
+}
+['system','area','spacing','height','water','doseType','dose','unit'].forEach(id=>{$(id).addEventListener('input',calculate);$(id).addEventListener('change',calculate)});
+$('preset').addEventListener('change',loadPreset);
+$('reset').addEventListener('click',()=>{$('system').value='espaldera';$('area').value='0.30';$('spacing').value='2.50';$('height').value='40';$('water').value='40';$('preset').value='kumulus';loadPreset()});
+calculate();
+</script>
+</body>
+</html>
