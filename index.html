@@ -54,6 +54,7 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 <option value="comet">Comet</option>
 <option value="serenade">Serenade ASO</option>
 <option value="spyra">Basfoliar Spyra SL</option>
+<option value="starter">Starter Stoller · Zn/B/Mn/S/Cu</option>
 <option value="custom">Otro / personalizado</option>
 </select>
 </label>
@@ -123,6 +124,7 @@ coprantol:{name:'Coprantol Duo',dose:'',unit:'g',type:'per100',note:'Producto pr
 comet:{name:'Comet',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete para vid.'},
 serenade:{name:'Serenade ASO',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete.'},
 spyra:{name:'Basfoliar Spyra SL',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete.'},
+starter:{name:'Starter Stoller',dose:350,unit:'mL',type:'per100',directWater:true,note:'Referencia de marbete: 350 mL/100 L para nogales y plantas pequeñas. No es dosis validada para vid. Cálculo directo sobre el volumen de agua (sin ajuste SFE). Composición: Zn 5%, B 0,5%, Mn 3%, S 4%, Cu 0,5%. Verificar con fabricante antes de aplicar.'},
 custom:{name:'Producto personalizado',dose:'',unit:'g',type:'per100',note:'Ingresá manualmente la dosis de referencia del producto.'}
 };
 let currentName='Kumulus DF';
@@ -133,11 +135,12 @@ const area=n('area',.30),spacing=n('spacing',2.5),hCm=n('height',40),h=hCm/100,w
 $('spacingValue').textContent=fmt(spacing,2)+' m';$('heightValue').textContent=fmt(hCm,0)+' cm';$('waterValue').textContent=fmt(water,0)+' L';$('waterTitle').textContent='Agua para las '+fmt(area,2)+' ha';
 const sfe=(10000/spacing)*h*faces,fSFE=sfe/10000,lha=water/area,fWater=1000/lha;
 const dose=Number(String($('dose').value).replace(',','.')),valid=Number.isFinite(dose)&&dose>0,unit=$('unit').value,type=$('doseType').value;
-let amount=null;if(valid)amount=type==='per100'?dose*fSFE*fWater*(water/100):dose*area*fSFE;
+let amount=null;const p=products[$('preset').value];const directWater=type==='per100'&&p.directWater===true;
+if(valid)amount=directWater?dose*water/100:(type==='per100'?dose*fSFE*fWater*(water/100):dose*area*fSFE);
 $('amount').textContent=amount===null?'—':fmt(amount,1)+' '+unit;
 $('resultSub').textContent=currentName+' · '+fmt(water,0)+' L · '+fmt(area,2)+' ha';
 $('sfe').textContent=fmt(sfe,0)+' m²';$('fsfe').textContent=fmt(fSFE,3);$('lha').textContent=fmt(lha,1)+' L/ha';$('fwater').textContent=fmt(fWater,2);
-$('calcDetail').innerHTML='<p><strong>SFE:</strong> (10.000 / '+fmt(spacing,2)+') × '+fmt(h,2)+' × '+faces+' = '+fmt(sfe,0)+' m²/ha</p><p><strong>Factor SFE:</strong> '+fmt(sfe,0)+' / 10.000 = '+fmt(fSFE,3)+'</p><p><strong>Volumen:</strong> '+fmt(water,0)+' L / '+fmt(area,2)+' ha = '+fmt(lha,1)+' L/ha</p><p><strong>Factor concentración:</strong> 1.000 / '+fmt(lha,1)+' = '+fmt(fWater,2)+'</p>';
+$('calcDetail').innerHTML=(directWater?'<p><strong>Starter:</strong> dosis del marbete para nogales y plantas pequeñas; cálculo por volumen de agua, sin ajuste SFE. No validada para vid.</p>':'')+'<p><strong>SFE:</strong> (10.000 / '+fmt(spacing,2)+') × '+fmt(h,2)+' × '+faces+' = '+fmt(sfe,0)+' m²/ha</p><p><strong>Factor SFE:</strong> '+fmt(sfe,0)+' / 10.000 = '+fmt(fSFE,3)+'</p><p><strong>Volumen:</strong> '+fmt(water,0)+' L / '+fmt(area,2)+' ha = '+fmt(lha,1)+' L/ha</p><p><strong>Factor concentración:</strong> 1.000 / '+fmt(lha,1)+' = '+fmt(fWater,2)+'</p>';
 }
 ['system','area','spacing','height','water','doseType','dose','unit'].forEach(id=>{$(id).addEventListener('input',calculate);$(id).addEventListener('change',calculate)});
 $('preset').addEventListener('change',loadPreset);
