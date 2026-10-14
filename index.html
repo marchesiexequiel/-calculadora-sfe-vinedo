@@ -74,7 +74,7 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 </section>
 
 <section class="card result">
-<div class="result-label">Cantidad a colocar en el tanque</div>
+<div class="result-label">Cantidad calculada con el agua recomendada por tLWA</div>
 <div id="amount" class="amount">96 g</div>
 <div id="resultSub" class="sub">Kumulus DF · 40 L · 0,30 ha</div>
 <div class="metrics">
@@ -121,7 +121,7 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 <div id="calcDetail" class="sub" style="margin-top:10px"></div>
 </details>
 <button id="reset" type="button">Restablecer ejemplo</button>
-<div class="footer">Prototipo para revisión técnica. Las dosis precargadas son valores de trabajo y deben verificarse contra el marbete vigente, formulación, cultivo autorizado y límites por hectárea.</div>
+<div class="footer">Prototipo para revisión técnica. Las dosis precargadas deben verificarse contra el marbete vigente. Versión cálculo tLWA: 2026-10-14.2</div>
 </section>
 </main>
 
@@ -142,17 +142,14 @@ custom:{name:'Producto personalizado',dose:'',unit:'g',type:'per100',note:'Ingre
 };
 let currentName='Kumulus DF';
 function n(id,f){const x=Number(String($(id).value).replace(',','.'));return Number.isFinite(x)&&x>0?x:f}
-function loadPreset(){const p=products[$('preset').value];currentName=p.name;$('dose').value=p.dose;$('unit').value=p.unit;$('doseType').value=p.type;let extraWarning='';
-if(p.minVolume && lha<p.minVolume){
-  extraWarning=' ⚠ Volumen por debajo del marbete: '+fmt(lha,1)+' L/ha; mínimo indicado '+fmt(p.minVolume,0)+' L/ha.';
+function loadPreset(){
+  const p=products[$('preset').value];
+  currentName=p.name;
+  $('dose').value=p.dose;
+  $('unit').value=p.unit;
+  $('doseType').value=p.type;
+  calculate();
 }
-if(p.maxVolume && lha>p.maxVolume){
-  extraWarning=' ⚠ Volumen por encima del rango de marbete: '+fmt(lha,1)+' L/ha; máximo indicado '+fmt(p.maxVolume,0)+' L/ha.';
-}
-if(p.minDrops){
-  extraWarning += ' Objetivo de cobertura del marbete: ≥'+fmt(p.minDrops,0)+' gotas/cm².';
-}
-$('productNote').textContent=p.note+extraWarning;calculate()}
 function calculate(){
 const area=n('area',.30),spacing=n('spacing',2.5),hCm=n('height',40),h=hCm/100,water=n('water',40),faces=$('system').value==='lira'?4:2;
 const calWater=n('calWater',40),calTLWA=n('calTLWA',960);
