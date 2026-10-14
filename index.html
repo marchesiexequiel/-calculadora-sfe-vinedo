@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Calculadora SFE Viñedo</title>
+<title>Calculadora fitosanitaria de viñedo</title>
 <style>
 :root{--bg:#f6f6f7;--card:#fff;--text:#111;--muted:#6b6b70;--border:#dddddf;--panel:#f0f0f2}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
@@ -28,7 +28,7 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 </head>
 <body>
 <main>
-<h1>Calculadora SFE Viñedo</h1>
+<h1>Calculadora fitosanitaria de viñedo</h1>
 
 <section class="card">
 <div class="grid grid2">
@@ -48,7 +48,7 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 <select id="preset">
 <option value="kumulus">Kumulus DF · Azufre 80%</option>
 <option value="captan">Merpan / Captan 83%</option>
-<option value="curzate">Curzate M8</option>
+<option value="curzate">Curzate M8 · vid / mildiu</option>
 <option value="copper">Oxicloruro de cobre 84–85%</option>
 <option value="coprantol">Coprantol Duo</option>
 <option value="comet">Comet</option>
@@ -78,7 +78,7 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 <div id="amount" class="amount">96 g</div>
 <div id="resultSub" class="sub">Kumulus DF · 40 L · 0,30 ha</div>
 <div class="metrics">
-<div class="metric"><small>SFE / ha</small><strong id="sfe">3.200 m²</strong></div>
+<div class="metric"><small>tLWA / ha</small><strong id="sfe">3.200 m²</strong></div>
 <div class="metric"><small>Volumen</small><strong id="lha">133,3 L/ha</strong></div>
 </div>
 </section>
@@ -102,8 +102,8 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 <details>
 <summary>Ver detalle del cálculo</summary>
 <div class="metrics">
-<div class="metric"><small>Factor SFE</small><strong id="fsfe">0,320</strong></div>
-<div class="metric"><small>Factor concentración</small><strong id="fwater">7,50</strong></div>
+<div class="metric"><small>tLWA / 10.000</small><strong id="fsfe">0,320</strong></div>
+<div class="metric"><small>Agua / 1.000 m² tLWA</small><strong id="fwater">41,7 L</strong></div>
 </div>
 <div id="calcDetail" class="sub" style="margin-top:10px"></div>
 </details>
@@ -116,11 +116,11 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 const $=id=>document.getElementById(id);
 const fmt=(v,d=2)=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:d}).format(v);
 const products={
-kumulus:{name:'Kumulus DF',dose:100,unit:'g',type:'per100',note:'Valor inicial de trabajo: 100 g/100 L. Confirmar siempre la formulación y el marbete vigente.'},
-captan:{name:'Merpan / Captan 83%',dose:180,unit:'g',type:'per100',note:'Valor inicial de trabajo: 180 g/100 L. Confirmar formulación y marbete.'},
-curzate:{name:'Curzate M8',dose:250,unit:'g',type:'per100',note:'Se muestra 250 g/100 L como valor de trabajo. Revisar el rango exacto indicado en tu envase.'},
-copper:{name:'Oxicloruro de cobre 84–85%',dose:350,unit:'g',type:'per100',note:'Se muestra 350 g/100 L como valor de trabajo. Ajustar según formulación y marbete.'},
-coprantol:{name:'Coprantol Duo',dose:'',unit:'g',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete exacto.'},
+kumulus:{name:'Kumulus DF',dose:100,unit:'g',type:'per100',note:'Marbete BASF Argentina para vid/oídio: 100 g/100 L en preventivo; 200–300 g/100 L al aparecer signos. La app calcula directo según litros de agua, sin corrección automática por tLWA.'},
+captan:{name:'Merpan / Captan 83%',dose:'',unit:'g',type:'per100',note:'ADAMA Argentina confirma Merpan (captan 83%) para vid y peronospora, pero la dosis exacta no aparece en la ficha web actual. Ingresá la dosis de tu marbete/envase antes de calcular.'},
+curzate:{name:'Curzate M8',dose:2000,unit:'g',type:'perha',note:'Referencia técnica SAG Chile para vid/mildiu: 200–300 g/100 L en aspersión diluida y 2–3 kg/ha en aspersión concentrada. Para bajo volumen, la etiqueta indica usar la dosis por hectárea. Valor inicial: 2.000 g/ha.'},
+copper:{name:'Oxicloruro de cobre 84–85%',dose:300,unit:'g',type:'per100',note:'Referencia argentina para peronospora en vid: 300–400 g/100 L. Valor inicial: 300 g/100 L. Verificar formulación y marbete del producto específico.'},
+coprantol:{name:'Coprantol Duo',dose:2500,unit:'g',type:'perha',note:'Referencia Syngenta para vid/mildiu en registros europeos: 2,5 kg/ha. Verificar el marbete vigente del producto disponible en Argentina antes de aplicar.'},
 comet:{name:'Comet',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete para vid.'},
 serenade:{name:'Serenade ASO',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete.'},
 spyra:{name:'Basfoliar Spyra SL',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete.'},
@@ -132,21 +132,53 @@ function n(id,f){const x=Number(String($(id).value).replace(',','.'));return Num
 function loadPreset(){const p=products[$('preset').value];currentName=p.name;$('dose').value=p.dose;$('unit').value=p.unit;$('doseType').value=p.type;$('productNote').textContent=p.note;calculate()}
 function calculate(){
 const area=n('area',.30),spacing=n('spacing',2.5),hCm=n('height',40),h=hCm/100,water=n('water',40),faces=$('system').value==='lira'?4:2;
-$('spacingValue').textContent=fmt(spacing,2)+' m';$('heightValue').textContent=fmt(hCm,0)+' cm';$('waterValue').textContent=fmt(water,0)+' L';$('waterTitle').textContent='Agua para las '+fmt(area,2)+' ha';
-const sfe=(10000/spacing)*h*faces,fSFE=sfe/10000,lha=water/area,fWater=1000/lha;
-const dose=Number(String($('dose').value).replace(',','.')),valid=Number.isFinite(dose)&&dose>0,unit=$('unit').value,type=$('doseType').value;
-let amount=null;const p=products[$('preset').value];const directWater=type==='per100'&&p.directWater===true;
-// Para Starter, el valor principal es una estimación SFE relativa a la referencia 2,50 m / 40 cm.
-// La dosis de marbete por 100 L se informa por separado y no debe confundirse con un ajuste autorizado.
-const referenceSFE=(10000/2.5)*0.40*2;
-const labelAmount=directWater&&valid?dose*water/100:null;
-const sfeRatio=sfe/referenceSFE;
-if(valid)amount=directWater?labelAmount*sfeRatio:(type==='per100'?dose*fSFE*fWater*(water/100):dose*area*fSFE);
+$('spacingValue').textContent=fmt(spacing,2)+' m';
+$('heightValue').textContent=fmt(hCm,0)+' cm';
+$('waterValue').textContent=fmt(water,0)+' L';
+$('waterTitle').textContent='Agua para las '+fmt(area,2)+' ha';
+
+const tlwa=(10000/spacing)*h*faces;
+const fTLWA=tlwa/10000;
+const tlwaTotal=tlwa*area;
+const lha=water/area;
+const waterPer1000=tlwaTotal>0 ? water/(tlwaTotal/1000) : null;
+
+const dose=Number(String($('dose').value).replace(',','.'));
+const valid=Number.isFinite(dose)&&dose>0;
+const unit=$('unit').value;
+const type=$('doseType').value;
+const p=products[$('preset').value];
+
+let amount=null;
+if(valid){
+  if(type==='per100') amount=dose*water/100;
+  if(type==='perha') amount=dose*area;
+}
+
 $('amount').textContent=amount===null?'—':fmt(amount,1)+' '+unit;
-$('resultSub').textContent=currentName+' · '+fmt(water,0)+' L · '+fmt(area,2)+' ha'+(directWater?' · estimación ajustada por SFE':'');
-$('productNote').textContent=directWater?products.starter.note+' Referencia directa de etiqueta con '+fmt(water,0)+' L: '+(labelAmount===null?'—':fmt(labelAmount,1)+' mL')+'. Estimación ajustada por SFE (base: 2,50 m entre hileras y 40 cm de follaje); el ajuste no está indicado en el marbete.':$('productNote').textContent;
-$('sfe').textContent=fmt(sfe,0)+' m²';$('fsfe').textContent=fmt(fSFE,3);$('lha').textContent=fmt(lha,1)+' L/ha';$('fwater').textContent=fmt(fWater,2);
-$('calcDetail').innerHTML=(directWater?'<p><strong>Starter — referencia fija del marbete para nogales y plantas pequeñas:</strong> '+(labelAmount===null?'—':fmt(labelAmount,1)+' mL')+' para '+fmt(water,0)+' L de agua (350 mL/100 L). <strong>Estimación por SFE:</strong> referencia fija × ('+fmt(sfe,0)+' / '+fmt(referenceSFE,0)+') = '+(amount===null?'—':fmt(amount,1)+' mL')+'. Esta variación de dosis no está respaldada por el marbete y no constituye recomendación para vid.</p>':'')+'<p><strong>SFE:</strong> (10.000 / '+fmt(spacing,2)+') × '+fmt(h,2)+' × '+faces+' = '+fmt(sfe,0)+' m²/ha</p><p><strong>Factor SFE:</strong> '+fmt(sfe,0)+' / 10.000 = '+fmt(fSFE,3)+'</p><p><strong>Volumen:</strong> '+fmt(water,0)+' L / '+fmt(area,2)+' ha = '+fmt(lha,1)+' L/ha</p><p><strong>Factor concentración:</strong> 1.000 / '+fmt(lha,1)+' = '+fmt(fWater,2)+'</p>';
+$('resultSub').textContent=currentName+' · '+fmt(water,0)+' L · '+fmt(area,2)+' ha';
+$('sfe').textContent=fmt(tlwa,0)+' m²';
+$('fsfe').textContent=fmt(fTLWA,3);
+$('lha').textContent=fmt(lha,1)+' L/ha';
+$('fwater').textContent=waterPer1000===null?'—':fmt(waterPer1000,1)+' L';
+
+const doseText = type==='per100'
+  ? (valid?fmt(dose,1)+' '+unit+'/100 L':'sin dosis ingresada')
+  : (valid?fmt(dose,1)+' '+unit+'/ha':'sin dosis ingresada');
+
+const formulaText = type==='per100'
+  ? (valid?'<p><strong>Dosis de producto:</strong> '+fmt(dose,1)+' '+unit+'/100 L × '+fmt(water,0)+' L / 100 = <strong>'+fmt(amount,1)+' '+unit+'</strong>.</p>':'')
+  : (valid?'<p><strong>Dosis de producto:</strong> '+fmt(dose,1)+' '+unit+'/ha × '+fmt(area,2)+' ha = <strong>'+fmt(amount,1)+' '+unit+'</strong>.</p>':'');
+
+$('calcDetail').innerHTML=
+  '<p><strong>tLWA:</strong> (10.000 / '+fmt(spacing,2)+') × '+fmt(h,2)+' × '+faces+' = '+fmt(tlwa,0)+' m²/ha.</p>'+
+  '<p><strong>tLWA total del lote:</strong> '+fmt(tlwaTotal,0)+' m².</p>'+
+  '<p><strong>Volumen:</strong> '+fmt(water,0)+' L / '+fmt(area,2)+' ha = '+fmt(lha,1)+' L/ha.</p>'+
+  '<p><strong>Agua por 1.000 m² tLWA:</strong> '+(waterPer1000===null?'—':fmt(waterPer1000,1)+' L')+'.</p>'+
+  '<p><strong>Base de dosis seleccionada:</strong> '+doseText+'. La tLWA se informa para caracterizar la canopia y la cobertura; no modifica automáticamente la dosis del marbete.</p>'+
+  formulaText;
+
+$('productNote').textContent=p.note;
 }
 ['system','area','spacing','height','water','doseType','dose','unit'].forEach(id=>{$(id).addEventListener('input',calculate);$(id).addEventListener('change',calculate)});
 $('preset').addEventListener('change',loadPreset);
