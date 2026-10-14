@@ -79,8 +79,21 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 <div id="resultSub" class="sub">Kumulus DF · 40 L · 0,30 ha</div>
 <div class="metrics">
 <div class="metric"><small>tLWA / ha</small><strong id="sfe">3.200 m²</strong></div>
-<div class="metric"><small>Volumen</small><strong id="lha">133,3 L/ha</strong></div>
+<div class="metric"><small>Volumen aplicado</small><strong id="lha">133,3 L/ha</strong></div><div class="metric"><small>Agua recomendada</small><strong id="waterRec">40 L</strong></div>
 </div>
+</section>
+
+<section class="card">
+<h2>Calibración de cobertura</h2>
+<div class="grid grid2">
+<label>Agua calibrada
+<input id="calWater" type="number" min="1" step="1" value="40" inputmode="decimal">
+</label>
+<label>tLWA de referencia (m²)
+<input id="calTLWA" type="number" min="100" step="10" value="960" inputmode="decimal">
+</label>
+</div>
+<div class="note">Valor provisional basado en tu situación actual: 40 L sobre 960 m² tLWA = 41,7 L/1.000 m² tLWA. Más adelante lo reemplazamos por la calibración con tarjetas hidrosensibles.</div>
 </section>
 
 <section class="card">
@@ -142,6 +155,8 @@ if(p.minDrops){
 $('productNote').textContent=p.note+extraWarning;calculate()}
 function calculate(){
 const area=n('area',.30),spacing=n('spacing',2.5),hCm=n('height',40),h=hCm/100,water=n('water',40),faces=$('system').value==='lira'?4:2;
+const calWater=n('calWater',40),calTLWA=n('calTLWA',960);
+
 $('spacingValue').textContent=fmt(spacing,2)+' m';
 $('heightValue').textContent=fmt(hCm,0)+' cm';
 $('waterValue').textContent=fmt(water,0)+' L';
@@ -151,6 +166,9 @@ const tlwa=(10000/spacing)*h*faces;
 const fTLWA=tlwa/10000;
 const tlwaTotal=tlwa*area;
 const lha=water/area;
+const waterRate1000=calWater/(calTLWA/1000);
+const recommendedWater=tlwaTotal*(waterRate1000/1000);
+const recommendedLha=recommendedWater/area;
 const waterPer1000=tlwaTotal>0 ? water/(tlwaTotal/1000) : null;
 
 const dose=Number(String($('dose').value).replace(',','.'));
@@ -161,15 +179,16 @@ const p=products[$('preset').value];
 
 let amount=null;
 if(valid){
-  if(type==='per100') amount=dose*water/100;
+  if(type==='per100') amount=dose*recommendedWater/100;
   if(type==='perha') amount=dose*area;
 }
 
 $('amount').textContent=amount===null?'—':fmt(amount,1)+' '+unit;
-$('resultSub').textContent=currentName+' · '+fmt(water,0)+' L · '+fmt(area,2)+' ha';
+$('resultSub').textContent=currentName+' · recomendado '+fmt(recommendedWater,1)+' L · '+fmt(area,2)+' ha';
 $('sfe').textContent=fmt(tlwa,0)+' m²';
 $('fsfe').textContent=fmt(fTLWA,3);
 $('lha').textContent=fmt(lha,1)+' L/ha';
+$('waterRec').textContent=fmt(recommendedWater,1)+' L';
 $('fwater').textContent=waterPer1000===null?'—':fmt(waterPer1000,1)+' L';
 
 const doseText = type==='per100'
@@ -177,20 +196,32 @@ const doseText = type==='per100'
   : (valid?fmt(dose,1)+' '+unit+'/ha':'sin dosis ingresada');
 
 const formulaText = type==='per100'
-  ? (valid?'<p><strong>Dosis de producto:</strong> '+fmt(dose,1)+' '+unit+'/100 L × '+fmt(water,0)+' L / 100 = <strong>'+fmt(amount,1)+' '+unit+'</strong>.</p>':'')
-  : (valid?'<p><strong>Dosis de producto:</strong> '+fmt(dose,1)+' '+unit+'/ha × '+fmt(area,2)+' ha = <strong>'+fmt(amount,1)+' '+unit+'</strong>.</p>':'');
+  ? (valid?'<p><strong>Dosis calculada con agua recomendada:</strong> '+fmt(dose,1)+' '+unit+'/100 L × '+fmt(recommendedWater,1)+' L / 100 = <strong>'+fmt(amount,1)+' '+unit+'</strong>.</p>':'')
+  : (valid?'<p><strong>Dosis por superficie:</strong> '+fmt(dose,1)+' '+unit+'/ha × '+fmt(area,2)+' ha = <strong>'+fmt(amount,1)+' '+unit+'</strong>.</p>':'');
 
 $('calcDetail').innerHTML=
   '<p><strong>tLWA:</strong> (10.000 / '+fmt(spacing,2)+') × '+fmt(h,2)+' × '+faces+' = '+fmt(tlwa,0)+' m²/ha.</p>'+
   '<p><strong>tLWA total del lote:</strong> '+fmt(tlwaTotal,0)+' m².</p>'+
-  '<p><strong>Volumen:</strong> '+fmt(water,0)+' L / '+fmt(area,2)+' ha = '+fmt(lha,1)+' L/ha.</p>'+
-  '<p><strong>Agua por 1.000 m² tLWA:</strong> '+(waterPer1000===null?'—':fmt(waterPer1000,1)+' L')+'.</p>'+
-  '<p><strong>Base de dosis seleccionada:</strong> '+doseText+'. La tLWA se informa para caracterizar la canopia y la cobertura; no modifica automáticamente la dosis del marbete.</p>'+
+  '<p><strong>Calibración usada:</strong> '+fmt(calWater,0)+' L / '+fmt(calTLWA,0)+' m² tLWA = '+fmt(waterRate1000,1)+' L/1.000 m² tLWA.</p>'+
+  '<p><strong>Agua recomendada por tLWA:</strong> '+fmt(recommendedWater,1)+' L ('+fmt(recommendedLha,1)+' L/ha).</p>'+
+  '<p><strong>Agua seleccionada manualmente:</strong> '+fmt(water,0)+' L ('+fmt(lha,1)+' L/ha).</p>'+
+  '<p><strong>Agua real por 1.000 m² tLWA:</strong> '+(waterPer1000===null?'—':fmt(waterPer1000,1)+' L')+'.</p>'+
+  '<p><strong>Base de dosis:</strong> '+doseText+'. La tLWA modifica el volumen recomendado; en productos expresados por 100 L, eso modifica la cantidad de producto. En productos expresados por ha, la dosis sigue la superficie.</p>'+
   formulaText;
 
-$('productNote').textContent=p.note;
+let extraWarning='';
+if(p.minVolume && recommendedLha<p.minVolume){
+  extraWarning=' ⚠ Con la calibración actual, el volumen recomendado es '+fmt(recommendedLha,1)+' L/ha, por debajo del mínimo de marbete '+fmt(p.minVolume,0)+' L/ha.';
 }
-['system','area','spacing','height','water','doseType','dose','unit'].forEach(id=>{$(id).addEventListener('input',calculate);$(id).addEventListener('change',calculate)});
+if(p.maxVolume && recommendedLha>p.maxVolume){
+  extraWarning=' ⚠ Con la calibración actual, el volumen recomendado es '+fmt(recommendedLha,1)+' L/ha, por encima del máximo de marbete '+fmt(p.maxVolume,0)+' L/ha.';
+}
+if(p.minDrops){
+  extraWarning += ' Objetivo de cobertura del marbete: ≥'+fmt(p.minDrops,0)+' gotas/cm².';
+}
+$('productNote').textContent=p.note+extraWarning;
+}
+['system','area','spacing','height','water','calWater','calTLWA','doseType','dose','unit'].forEach(id=>{$(id).addEventListener('input',calculate);$(id).addEventListener('change',calculate)});
 $('preset').addEventListener('change',loadPreset);
 $('reset').addEventListener('click',()=>{$('system').value='espaldera';$('area').value='0.30';$('spacing').value='2.50';$('height').value='40';$('water').value='40';$('preset').value='kumulus';loadPreset()});
 calculate();
