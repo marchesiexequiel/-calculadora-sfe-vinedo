@@ -118,7 +118,7 @@ const fmt=(v,d=2)=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:d}).form
 const products={
 kumulus:{name:'Kumulus DF',dose:100,unit:'g',type:'per100',note:'Marbete BASF Argentina para vid/oídio: 100 g/100 L en preventivo; 200–300 g/100 L al aparecer signos. La app calcula directo según litros de agua, sin corrección automática por tLWA.'},
 captan:{name:'Merpan / Captan 83%',dose:'',unit:'g',type:'per100',note:'ADAMA Argentina confirma Merpan (captan 83%) para vid y peronospora, pero la dosis exacta no aparece en la ficha web actual. Ingresá la dosis de tu marbete/envase antes de calcular.'},
-curzate:{name:'Curzate M8',dose:2000,unit:'g',type:'perha',note:'Referencia técnica SAG Chile para vid/mildiu: 200–300 g/100 L en aspersión diluida y 2–3 kg/ha en aspersión concentrada. Para bajo volumen, la etiqueta indica usar la dosis por hectárea. Valor inicial: 2.000 g/ha.'},
+curzate:{name:'Curzate Farm Chemicals',dose:200,unit:'g',type:'per100',minVolume:200,maxVolume:600,minDrops:60,note:'Marbete argentino SENASA N° 40.731 para vid/mildiu: 200–250 g/100 L. Aplicación terrestre: 200–600 L/ha y cobertura mínima 60 gotas/cm². Valor inicial: 200 g/100 L.'},
 copper:{name:'Oxicloruro de cobre 84–85%',dose:300,unit:'g',type:'per100',note:'Referencia argentina para peronospora en vid: 300–400 g/100 L. Valor inicial: 300 g/100 L. Verificar formulación y marbete del producto específico.'},
 coprantol:{name:'Coprantol Duo',dose:2500,unit:'g',type:'perha',note:'Referencia Syngenta para vid/mildiu en registros europeos: 2,5 kg/ha. Verificar el marbete vigente del producto disponible en Argentina antes de aplicar.'},
 comet:{name:'Comet',dose:'',unit:'mL',type:'per100',note:'Producto precargado. La dosis queda pendiente hasta confirmar el marbete para vid.'},
@@ -129,7 +129,17 @@ custom:{name:'Producto personalizado',dose:'',unit:'g',type:'per100',note:'Ingre
 };
 let currentName='Kumulus DF';
 function n(id,f){const x=Number(String($(id).value).replace(',','.'));return Number.isFinite(x)&&x>0?x:f}
-function loadPreset(){const p=products[$('preset').value];currentName=p.name;$('dose').value=p.dose;$('unit').value=p.unit;$('doseType').value=p.type;$('productNote').textContent=p.note;calculate()}
+function loadPreset(){const p=products[$('preset').value];currentName=p.name;$('dose').value=p.dose;$('unit').value=p.unit;$('doseType').value=p.type;let extraWarning='';
+if(p.minVolume && lha<p.minVolume){
+  extraWarning=' ⚠ Volumen por debajo del marbete: '+fmt(lha,1)+' L/ha; mínimo indicado '+fmt(p.minVolume,0)+' L/ha.';
+}
+if(p.maxVolume && lha>p.maxVolume){
+  extraWarning=' ⚠ Volumen por encima del rango de marbete: '+fmt(lha,1)+' L/ha; máximo indicado '+fmt(p.maxVolume,0)+' L/ha.';
+}
+if(p.minDrops){
+  extraWarning += ' Objetivo de cobertura del marbete: ≥'+fmt(p.minDrops,0)+' gotas/cm².';
+}
+$('productNote').textContent=p.note+extraWarning;calculate()}
 function calculate(){
 const area=n('area',.30),spacing=n('spacing',2.5),hCm=n('height',40),h=hCm/100,water=n('water',40),faces=$('system').value==='lira'?4:2;
 $('spacingValue').textContent=fmt(spacing,2)+' m';
