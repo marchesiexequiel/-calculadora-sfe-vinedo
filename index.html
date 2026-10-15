@@ -166,6 +166,12 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 </div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 </section>
+
+<section class="card" id="vidguardIntegration">
+<h2>Integración con VidGuard</h2>
+<div class="note">Conservamos tus aplicaciones en este dispositivo. Para transferirlas a VidGuard, generá una copia JSON y luego importala al módulo de aplicaciones. La sincronización automática con Firebase se habilitará cuando configuremos acceso autenticado.</div>
+<button type="button" id="exportVidguard" class="secondary">Exportar para VidGuard</button>
+</section>
 </main>
 
 <script>
@@ -396,6 +402,15 @@ $('importFile').addEventListener('change',async e=>{
   resetApplication();renderJournal();journalMsg('Importación completada: '+data.applications.length+' registros leídos.');
  }catch(err){journalMsg('No se importó el archivo: '+err.message);}
  finally{e.target.value='';}
+});
+
+$('exportVidguard').addEventListener('click',()=>{
+ const applications=journal.map(app=>({...app,doseBasisLiters:10,products:(app.products||[]).map(p=>({...p,dosePer10Liters:dosePer10(p.amount,app.waterLiters)}))}));
+ const payload={schemaVersion:1,source:'sfe-vinedo',exportedAt:new Date().toISOString(),applications};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
+ a.download='vidguard-aplicaciones.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ journalMsg('Exportación de '+applications.length+' aplicaciones para VidGuard.');
 });
 readJournal();resetApplication();renderJournal();
 </script>
