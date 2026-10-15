@@ -167,6 +167,13 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 </section>
 
+<section class="card" id="firebaseLogin">
+<h2>Cuenta VidGuard</h2>
+<div class="note">Ingresá con Google para identificar tu usuario de Firebase. La sincronización de aplicaciones todavía no está habilitada: tus registros continúan guardados en este navegador.</div>
+<p id="firebaseAuthStatus" role="status">Sin iniciar sesión.</p>
+<div id="firebaseUserInfo" class="note" hidden></div>
+<div class="actions"><button id="firebaseSignIn" type="button">Iniciar sesión con Google</button><button id="firebaseSignOut" class="secondary" type="button" hidden>Cerrar sesión</button><button id="firebaseCopyUid" class="secondary" type="button" hidden>Copiar UID</button></div>
+</section>
 <section class="card" id="vidguardIntegration">
 <h2>Integración con VidGuard</h2>
 <div class="note">Conservamos tus aplicaciones en este dispositivo. Para transferirlas a VidGuard, generá una copia JSON y luego importala al módulo de aplicaciones. La sincronización automática con Firebase se habilitará cuando configuremos acceso autenticado.</div>
@@ -413,6 +420,50 @@ $('exportVidguard').addEventListener('click',()=>{
  journalMsg('Exportación de '+applications.length+' aplicaciones para VidGuard.');
 });
 readJournal();resetApplication();renderJournal();
+</script>
+
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {getAuth,GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,getRedirectResult,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+const config={
+ apiKey:"AIzaSyClcnr9ca-gawV0H9IQwUgpV_FLlTLw114",
+ authDomain:"vidguard-demo.firebaseapp.com",
+ databaseURL:"https://vidguard-demo-default-rtdb.firebaseio.com",
+ projectId:"vidguard-demo",
+ appId:"1:536193452412:web:144ccfb7b52e51cbe27cf9"
+};
+const el=id=>document.getElementById(id);
+const status=message=>{el('firebaseAuthStatus').textContent=message;};
+try{
+ const auth=getAuth(initializeApp(config));
+ const provider=new GoogleAuthProvider();
+ onAuthStateChanged(auth,user=>{
+  el('firebaseSignIn').hidden=!!user;
+  el('firebaseSignOut').hidden=!user;
+  el('firebaseCopyUid').hidden=!user;
+  el('firebaseUserInfo').hidden=!user;
+  if(user){
+   el('firebaseUserInfo').textContent='Cuenta: '+(user.email||'Google')+' | UID: '+user.uid;
+   status('Sesión iniciada. Falta habilitar sincronización segura.');
+  }else status('Sin iniciar sesión. Las aplicaciones siguen guardadas localmente.');
+ });
+ el('firebaseSignIn').addEventListener('click',async()=>{
+  status('Abriendo Google…');
+  try{await signInWithPopup(auth,provider);}
+  catch(e){
+   if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code)){
+    status('Redirigiendo a Google…');await signInWithRedirect(auth,provider);
+   }else status('No se pudo iniciar sesión: '+(e.code||e.message));
+  }
+ });
+ el('firebaseSignOut').addEventListener('click',()=>signOut(auth).catch(e=>status(e.message)));
+ el('firebaseCopyUid').addEventListener('click',async()=>{
+  if(!auth.currentUser)return;
+  try{await navigator.clipboard.writeText(auth.currentUser.uid);status('UID copiado. No compartas contraseñas ni tokens.');}
+  catch(e){status('No se pudo copiar; seleccioná el UID que aparece arriba.');}
+ });
+ getRedirectResult(auth).catch(e=>status('Error al regresar desde Google: '+(e.code||e.message)));
+}catch(e){status('No se pudo inicializar Firebase: '+e.message);}
 </script>
 </body>
 </html>
