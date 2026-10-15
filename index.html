@@ -137,6 +137,7 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 
 <section class="card" id="applicationJournal">
 <h2>Cuaderno de aplicaciones</h2>
+<div class="note">Las dosis también se muestran y exportan expresadas <strong>cada 10 L de agua</strong>, como en el cuaderno del ingeniero. Se calculan desde la cantidad total registrada y el agua realmente aplicada.</div>
 <div class="note">Registrá las cantidades <strong>realmente aplicadas</strong>. Este historial se guarda por ahora en este navegador, no en Firebase. Exportá una copia JSON para respaldo.</div>
 <div class="grid grid2" style="margin-top:12px">
 <label>Fecha<input type="date" id="appDate"></label>
@@ -270,6 +271,7 @@ const STORAGE_KEY='sfe-vinedo-applications-v1';
 let editingApplicationId=null;
 let journal=[];
 const newId=()=>('app-'+Date.now()+'-'+Math.random().toString(36).slice(2,9));
+const dosePer10=(amount,water)=>Number.isFinite(Number(amount))&&Number(water)>0?Number(amount)*10/Number(water):null;
 const safeText=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const journalMsg=x=>{$('journalMessage').textContent=x;};
 function readJournal(){
@@ -323,8 +325,8 @@ function collectApplication(){
  const now=new Date().toISOString();
  return {schemaVersion:1,id:editingApplicationId||newId(),date:$('appDate').value,
   startTime:$('appTime').value,endTime:$('appEnd').value,status:$('appStatus').value,
-  areaHa:area,waterLiters:water,sector:$('appSector').value.trim(),
-  target:$('appTarget').value.trim(),products:items,notes:$('appNotes').value.trim(),
+  areaHa:area,waterLiters:water,doseBasisLiters:10,sector:$('appSector').value.trim(),
+  target:$('appTarget').value.trim(),products:items.map(p=>({...p,dosePer10Liters:dosePer10(p.amount,water)})),notes:$('appNotes').value.trim(),
   weatherSnapshot:null,weatherSource:null,createdAt:now,updatedAt:now};
 }
 function renderJournal(){
@@ -332,7 +334,11 @@ function renderJournal(){
  if(!journal.length){el.innerHTML='<p class="note">Sin aplicaciones registradas en este navegador.</p>';return;}
  for(const app of [...journal].sort((a,b)=>(b.date||'').localeCompare(a.date||''))){
   const card=document.createElement('div');card.className='record';
-  const lines=(Array.isArray(app.products)?app.products:[]).map(p=>safeText(p.name)+' · '+safeText(p.amount)+' '+safeText(p.unit)).join(' / ');
+  const lines=(Array.isArray(app.products)?app.products:[]).map(p=>{
+   const amount=Number(p.amount),per10=dosePer10(amount,app.waterLiters);
+   return safeText(p.name)+' · '+safeText(p.amount)+' '+safeText(p.unit)+
+    (per10===null?'':' <strong>('+fmt(per10,2)+' '+safeText(p.unit)+'/10 L)</strong>');
+  }).join(' / ');
   card.innerHTML='<h3>'+safeText(app.date)+' · '+safeText(app.status)+'</h3>'+
    '<p>'+safeText(app.sector)+' · '+safeText(app.areaHa)+' ha · '+safeText(app.waterLiters)+' L</p>'+
    '<p>'+lines+'</p><p>'+safeText(app.target)+' '+safeText(app.notes)+'</p>'+
@@ -373,7 +379,8 @@ $('saveApplication').addEventListener('click',()=>{
 $('cancelApplication').addEventListener('click',()=>{resetApplication();journalMsg('Edición cancelada.');});
 $('addAppProduct').addEventListener('click',()=>addProductRow());
 $('exportApplications').addEventListener('click',()=>{
- const blob=new Blob([JSON.stringify({schemaVersion:1,exportedAt:new Date().toISOString(),applications:journal},null,2)],{type:'application/json'});
+ const exported=journal.map(app=>({...app,doseBasisLiters:10,products:(app.products||[]).map(p=>({...p,dosePer10Liters:dosePer10(p.amount,app.waterLiters)}))}));
+ const blob=new Blob([JSON.stringify({schemaVersion:1,exportedAt:new Date().toISOString(),applications:exported},null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='sfe-vinedo-aplicaciones.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 $('importApplications').addEventListener('click',()=>$('importFile').click());
