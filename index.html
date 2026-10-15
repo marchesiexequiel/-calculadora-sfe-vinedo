@@ -24,6 +24,17 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 .footer{font-size:11px;color:var(--muted);line-height:1.4;margin-top:10px}
 @media(max-width:520px){.grid2{grid-template-columns:1fr}.slider-title{font-size:15px}.slider-value{font-size:23px}.amount{font-size:42px}}
 @media(max-width:360px){.slider-title{font-size:14px}.slider-value{font-size:21px}.amount{font-size:38px}.metrics{grid-template-columns:1fr}}
+
+input[type=date],input[type=time],input[type=text],textarea{width:100%;margin-top:6px;min-height:46px;border:1px solid var(--border);border-radius:15px;background:white;padding:10px 13px;font-size:16px;font-family:inherit}
+textarea{min-height:76px;resize:vertical}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1;min-width:100px}
+button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6e6;color:#9b2525}
+.record{border:1px solid var(--border);border-radius:16px;padding:12px;margin:10px 0}
+.record h3{font-size:16px;margin:0 0 5px}.record p{font-size:13px;color:var(--muted);margin:5px 0}
+.record-products{display:grid;grid-template-columns:minmax(0,1fr) 105px 76px 40px;gap:5px;align-items:end;margin-top:8px}
+.record-products input,.record-products select{min-width:0}
+.record-products button{min-width:0;margin:0;padding:0}
+@media(max-width:520px){.record-products{grid-template-columns:minmax(0,1fr) 85px 65px 34px}}
 </style>
 </head>
 <body>
@@ -122,6 +133,37 @@ button{width:100%;min-height:46px;border:0;border-radius:15px;background:#111;co
 </details>
 <button id="reset" type="button">Restablecer ejemplo</button>
 <div class="footer">Prototipo para revisión técnica. Las dosis precargadas deben verificarse contra el marbete vigente. Versión cálculo tLWA: 2026-10-14.2</div>
+</section>
+
+<section class="card" id="applicationJournal">
+<h2>Cuaderno de aplicaciones</h2>
+<div class="note">Registrá las cantidades <strong>realmente aplicadas</strong>. Este historial se guarda por ahora en este navegador, no en Firebase. Exportá una copia JSON para respaldo.</div>
+<div class="grid grid2" style="margin-top:12px">
+<label>Fecha<input type="date" id="appDate"></label>
+<label>Hora de inicio<input type="time" id="appTime"></label>
+<label>Hora de finalización<input type="time" id="appEnd"></label>
+<label>Estado<select id="appStatus"><option value="realizada">Realizada</option><option value="planificada">Planificada</option></select></label>
+<label>Superficie tratada (ha)<input type="number" id="appArea" min="0.01" step="0.01" value="0.30"></label>
+<label>Agua realmente aplicada (L)<input type="number" id="appWater" min="0.1" step="0.1" value="40"></label>
+<label>Sector/variedades<input type="text" id="appSector" value="Viñedo completo" maxlength="160"></label>
+<label>Objetivo sanitario<input type="text" id="appTarget" placeholder="Ej.: peronóspora" maxlength="160"></label>
+</div>
+<h3 style="font-size:15px;margin:16px 0 8px">Productos del tratamiento</h3>
+<div id="appProducts"></div>
+<button type="button" class="secondary" id="addAppProduct">+ Agregar producto</button>
+<label style="margin-top:12px">Observaciones<textarea id="appNotes" maxlength="2000" placeholder="Lluvias, estado del follaje, cobertura, equipo, etc."></textarea></label>
+<div class="actions">
+<button type="button" id="saveApplication">Guardar aplicación</button>
+<button type="button" class="secondary" id="cancelApplication" hidden>Cancelar edición</button>
+</div>
+<div id="journalMessage" class="footer" role="status" aria-live="polite"></div>
+<h2 style="margin-top:20px">Historial de aplicaciones</h2>
+<div id="applicationList"><p class="note">Sin aplicaciones registradas en este navegador.</p></div>
+<div class="actions">
+<button type="button" id="exportApplications" class="secondary">Exportar JSON</button>
+<button type="button" id="importApplications" class="secondary">Importar JSON</button>
+</div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
 </section>
 </main>
 
@@ -222,6 +264,133 @@ $('productNote').textContent=p.note+extraWarning;
 $('preset').addEventListener('change',loadPreset);
 $('reset').addEventListener('click',()=>{$('system').value='espaldera';$('area').value='0.30';$('spacing').value='2.50';$('height').value='40';$('water').value='40';$('preset').value='kumulus';loadPreset()});
 calculate();
+
+/* Cuaderno local v1 — modelo de datos compatible con futura integración Firebase. */
+const STORAGE_KEY='sfe-vinedo-applications-v1';
+let editingApplicationId=null;
+let journal=[];
+const newId=()=>('app-'+Date.now()+'-'+Math.random().toString(36).slice(2,9));
+const safeText=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const journalMsg=x=>{$('journalMessage').textContent=x;};
+function readJournal(){
+ try{const v=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');journal=Array.isArray(v)?v:[];}
+ catch(e){journal=[];journalMsg('No se pudo leer el historial local. No se sobrescribieron datos.');}
+}
+function writeJournal(){
+ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(journal));return true;}
+ catch(e){journalMsg('No se pudo guardar: almacenamiento del navegador bloqueado o lleno. Exportá una copia.');return false;}
+}
+function productOptions(selected){
+ return Object.entries(products).map(([key,p])=>'<option value="'+safeText(key)+'"'+(key===selected?' selected':'')+'>'+safeText(p.name)+'</option>').join('');
+}
+function addProductRow(item={}){
+ const row=document.createElement('div');row.className='record-products';
+ row.innerHTML='<label>Producto<select class="appProd">'+productOptions(item.key||$('preset').value)+'</select></label>'+
+ '<label>Cantidad<input class="appQty" type="number" min="0.01" step="any" inputmode="decimal" placeholder="0" value="'+safeText(item.amount??'')+'"></label>'+
+ '<label>Unidad<select class="appUnit"><option value="g">g</option><option value="mL">mL</option></select></label>'+
+ '<button type="button" class="secondary" aria-label="Eliminar producto">×</button>';
+ row.querySelector('.appUnit').value=item.unit||products[item.key||$('preset').value].unit;
+ row.querySelector('button').addEventListener('click',()=>row.remove());
+ row.querySelector('.appProd').addEventListener('change',()=>{row.querySelector('.appUnit').value=products[row.querySelector('.appProd').value].unit;});
+ $('appProducts').append(row);
+}
+function resetApplication(){
+ editingApplicationId=null;
+ $('appDate').value=new Date().toLocaleDateString('en-CA');
+ $('appTime').value=new Date().toTimeString().slice(0,5);
+ $('appEnd').value='';
+ $('appStatus').value='realizada';
+ $('appArea').value=$('area').value;
+ $('appWater').value=$('water').value;
+ $('appSector').value='Viñedo completo';
+ $('appTarget').value='';
+ $('appNotes').value='';
+ $('appProducts').replaceChildren();
+ addProductRow();
+ $('saveApplication').textContent='Guardar aplicación';
+ $('cancelApplication').hidden=true;
+}
+function collectApplication(){
+ const area=Number($('appArea').value),water=Number($('appWater').value);
+ if(!$('appDate').value||!Number.isFinite(area)||area<=0||!Number.isFinite(water)||water<=0)throw Error('Completá fecha, superficie y agua con valores positivos.');
+ const items=[...$('appProducts').children].map(row=>({
+  key:row.querySelector('.appProd').value,
+  name:products[row.querySelector('.appProd').value].name,
+  amount:Number(row.querySelector('.appQty').value),
+  unit:row.querySelector('.appUnit').value
+ }));
+ if(!items.length||items.some(p=>!Number.isFinite(p.amount)||p.amount<=0))throw Error('Ingresá al menos un producto con cantidad real positiva.');
+ const now=new Date().toISOString();
+ return {schemaVersion:1,id:editingApplicationId||newId(),date:$('appDate').value,
+  startTime:$('appTime').value,endTime:$('appEnd').value,status:$('appStatus').value,
+  areaHa:area,waterLiters:water,sector:$('appSector').value.trim(),
+  target:$('appTarget').value.trim(),products:items,notes:$('appNotes').value.trim(),
+  weatherSnapshot:null,weatherSource:null,createdAt:now,updatedAt:now};
+}
+function renderJournal(){
+ const el=$('applicationList');el.replaceChildren();
+ if(!journal.length){el.innerHTML='<p class="note">Sin aplicaciones registradas en este navegador.</p>';return;}
+ for(const app of [...journal].sort((a,b)=>(b.date||'').localeCompare(a.date||''))){
+  const card=document.createElement('div');card.className='record';
+  const lines=(Array.isArray(app.products)?app.products:[]).map(p=>safeText(p.name)+' · '+safeText(p.amount)+' '+safeText(p.unit)).join(' / ');
+  card.innerHTML='<h3>'+safeText(app.date)+' · '+safeText(app.status)+'</h3>'+
+   '<p>'+safeText(app.sector)+' · '+safeText(app.areaHa)+' ha · '+safeText(app.waterLiters)+' L</p>'+
+   '<p>'+lines+'</p><p>'+safeText(app.target)+' '+safeText(app.notes)+'</p>'+
+   '<div class="actions"><button type="button" class="secondary edit">Editar</button><button type="button" class="danger delete">Eliminar</button></div>';
+  card.querySelector('.edit').addEventListener('click',()=>editApplication(app.id));
+  card.querySelector('.delete').addEventListener('click',()=>removeApplication(app.id));
+  el.append(card);
+ }
+}
+function editApplication(id){
+ const app=journal.find(x=>x.id===id);if(!app)return;
+ editingApplicationId=id;
+ $('appDate').value=app.date||'';$('appTime').value=app.startTime||'';$('appEnd').value=app.endTime||'';
+ $('appStatus').value=app.status||'realizada';$('appArea').value=app.areaHa;
+ $('appWater').value=app.waterLiters;$('appSector').value=app.sector||'';
+ $('appTarget').value=app.target||'';$('appNotes').value=app.notes||'';
+ $('appProducts').replaceChildren();(app.products||[]).forEach(addProductRow);
+ $('saveApplication').textContent='Actualizar aplicación';$('cancelApplication').hidden=false;
+ $('applicationJournal').scrollIntoView({behavior:'smooth'});journalMsg('Editando aplicación del '+app.date+'.');
+}
+function removeApplication(id){
+ if(!confirm('¿Eliminar definitivamente este registro del historial local?'))return;
+ const next=journal.filter(x=>x.id!==id),old=journal;journal=next;
+ if(!writeJournal()){journal=old;return;}
+ if(editingApplicationId===id)resetApplication();
+ renderJournal();journalMsg('Aplicación eliminada.');
+}
+$('saveApplication').addEventListener('click',()=>{
+ try{
+  const app=collectApplication(),idx=journal.findIndex(x=>x.id===app.id);
+  if(idx>=0){app.createdAt=journal[idx].createdAt;app.weatherSnapshot=journal[idx].weatherSnapshot||null;app.weatherSource=journal[idx].weatherSource||null;}
+  const old=journal.slice();
+  if(idx>=0)journal[idx]=app;else journal.push(app);
+  if(!writeJournal()){journal=old;return;}
+  resetApplication();renderJournal();journalMsg('Aplicación guardada en este navegador. Recordá exportar una copia.');
+ }catch(e){journalMsg(e.message);}
+});
+$('cancelApplication').addEventListener('click',()=>{resetApplication();journalMsg('Edición cancelada.');});
+$('addAppProduct').addEventListener('click',()=>addProductRow());
+$('exportApplications').addEventListener('click',()=>{
+ const blob=new Blob([JSON.stringify({schemaVersion:1,exportedAt:new Date().toISOString(),applications:journal},null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='sfe-vinedo-aplicaciones.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+$('importApplications').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',async e=>{
+ const file=e.target.files[0];if(!file)return;
+ try{
+  const data=JSON.parse(await file.text());
+  if(data.schemaVersion!==1||!Array.isArray(data.applications)||data.applications.some(x=>!x||typeof x.id!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(x.date||'')||!Array.isArray(x.products)))throw Error('Archivo inválido o versión incompatible.');
+  if(!confirm('Importar '+data.applications.length+' aplicaciones? Se combinarán por ID con el historial existente.'))return;
+  const old=journal.slice(),merged=new Map(journal.map(x=>[x.id,x]));
+  data.applications.forEach(x=>merged.set(x.id,x));journal=[...merged.values()];
+  if(!writeJournal()){journal=old;return;}
+  resetApplication();renderJournal();journalMsg('Importación completada: '+data.applications.length+' registros leídos.');
+ }catch(err){journalMsg('No se importó el archivo: '+err.message);}
+ finally{e.target.value='';}
+});
+readJournal();resetApplication();renderJournal();
 </script>
 </body>
 </html>
