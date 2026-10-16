@@ -169,7 +169,7 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 
 <section class="card" id="firebaseLogin">
 <h2>Cuenta VidGuard</h2>
-<div class="note">Ingresá con Google para identificar tu usuario de Firebase. La sincronización de aplicaciones todavía no está habilitada: tus registros continúan guardados en este navegador.</div>
+<div class="note">Ingresá con Google para identificar tu usuario de Firebase. Las aplicaciones se guardan localmente y se sincronizan con Firebase al guardar, si iniciás sesión con tu cuenta autorizada. Si no hay conexión, podrás reintentar.</div>
 <p id="firebaseAuthStatus" role="status">Sin iniciar sesión.</p>
 <div id="firebaseUserInfo" class="note" hidden></div>
 <div class="actions"><button id="firebaseSignIn" type="button">Iniciar sesión con Google</button><button id="firebaseSignOut" class="secondary" type="button" hidden>Cerrar sesión</button><button id="firebaseCopyUid" class="secondary" type="button" hidden>Copiar UID</button></div>
@@ -379,7 +379,7 @@ function removeApplication(id){
  const next=journal.filter(x=>x.id!==id),old=journal;journal=next;
  if(!writeJournal()){journal=old;return;}
  if(editingApplicationId===id)resetApplication();
- renderJournal();journalMsg('Aplicación eliminada.');
+ renderJournal();journalMsg('Eliminada solo de este navegador. Si estaba sincronizada, permanece en Firebase.');
 }
 $('saveApplication').addEventListener('click',()=>{
  try{
@@ -388,7 +388,8 @@ $('saveApplication').addEventListener('click',()=>{
   const old=journal.slice();
   if(idx>=0)journal[idx]=app;else journal.push(app);
   if(!writeJournal()){journal=old;return;}
-  resetApplication();renderJournal();journalMsg('Aplicación guardada en este navegador. Recordá exportar una copia.');
+  resetApplication();renderJournal();journalMsg('Aplicación guardada localmente; verificando sincronización…');
+  window.dispatchEvent(new CustomEvent('sfe-application-saved',{detail:{application:app}}));
  }catch(e){journalMsg(e.message);}
 });
 $('cancelApplication').addEventListener('click',()=>{resetApplication();journalMsg('Edición cancelada.');});
@@ -436,7 +437,7 @@ readJournal();resetApplication();renderJournal();
 
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import {getDatabase,ref,get,update} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
+import {getDatabase,ref,get,update,set} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getAuth,GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,getRedirectResult,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 const config={
  apiKey:"AIzaSyClcnr9ca-gawV0H9IQwUgpV_FlLTlw114",
@@ -454,6 +455,42 @@ try{
  const allowedUid='ZPfjgbiFq0d8inDOhYEEMQzM6Zg2';
  const syncStatus=m=>{el('firebaseSyncStatus').textContent=m;};
  const authorized=()=>auth.currentUser&&auth.currentUser.uid===allowedUid;
+
+ const PENDING_KEY='sfe-vinedo-pending-sync-v1';
+ function pendingIds(){try{const v=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}}
+ function markPending(id){
+  try{localStorage.setItem(PENDING_KEY,JSON.stringify([...new Set([...pendingIds(),id])]));}
+  catch(e){syncStatus('No se pudo almacenar la cola de sincronización. Exportá un respaldo JSON.');}
+ }
+ function clearPending(id){
+  try{localStorage.setItem(PENDING_KEY,JSON.stringify(pendingIds().filter(x=>x!==id)));}
+  catch(e){syncStatus('Guardado remoto confirmado, pero no se pudo actualizar la cola local.');}
+ }
+ let saving=Promise.resolve();
+ async function sendRecord(record){
+  if(!authorized()){syncStatus('Guardado local. Iniciá sesión con la cuenta autorizada para sincronizar.');return;}
+  const id=record.id;
+  if(!/^app-[A-Za-z0-9-]+$/.test(id)){syncStatus('ID inválido; guardado solo local.');return;}
+  try{
+   await set(ref(db,'applications/'+allowedUid+'/'+id),record);
+   clearPending(id);
+   syncStatus('Sincronizado en Firebase: '+record.date+' ('+record.products.length+' productos).');
+   document.getElementById('journalMessage').textContent='Guardado local y sincronizado con VidGuard.';
+  }catch(e){
+   syncStatus('Pendiente de sincronizar ('+(e.code||e.message)+'). El registro permanece en este dispositivo.');
+   document.getElementById('journalMessage').textContent='Guardado local; error de sincronización. Podés usar Sincronizar con VidGuard para reintentar.';
+  }
+ }
+ window.addEventListener('sfe-application-saved',event=>{
+  const app=event.detail.application;markPending(app.id);
+  saving=saving.then(()=>sendRecord(app));
+ });
+ async function retryPending(){
+  if(!authorized())return;
+  const ids=pendingIds();if(!ids.length)return;
+  const all=window.SFEJournal.list();
+  for(const id of ids){const app=all.find(x=>x.id===id);if(app)await sendRecord(app);}
+ }
  const provider=new GoogleAuthProvider();
  onAuthStateChanged(auth,user=>{
   el('firebaseSignIn').hidden=!!user;
@@ -466,6 +503,7 @@ try{
   if(user){
    el('firebaseUserInfo').textContent='Cuenta: '+(user.email||'Google')+' | UID: '+user.uid;
    status('Sesión iniciada en Firebase.');
+   if(user.uid===allowedUid){saving=saving.then(()=>retryPending());}
   }else status('Sin iniciar sesión. Las aplicaciones siguen guardadas localmente.');
  });
  el('firebaseSignIn').addEventListener('click',async()=>{
@@ -496,11 +534,11 @@ try{
    const pending={};let already=0;
    for(const a of apps){
     if(!/^app-[A-Za-z0-9-]+$/.test(a.id))throw Error('ID de aplicación incompatible: '+a.id);
-    if(Object.prototype.hasOwnProperty.call(remote,a.id)){already++;continue;}
+    if(Object.prototype.hasOwnProperty.call(remote,a.id)&&!pendingIds().includes(a.id)){already++;continue;}
     pending[a.id]=a;
    }
    const count=Object.keys(pending).length;
-   if(count)await update(base,pending);
+   if(count){await update(base,pending);Object.keys(pending).forEach(clearPending);}
    syncStatus('Sincronización completada: '+count+' nuevos registros guardados, '+already+' ya existentes. Revisá Firebase → Datos → applications.');
   }catch(e){syncStatus('Error al sincronizar: '+(e.code||e.message)+'. Los registros locales no fueron borrados.');}
   finally{button.disabled=false;}
