@@ -173,6 +173,8 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 <p id="firebaseAuthStatus" role="status">Sin iniciar sesión.</p>
 <div id="firebaseUserInfo" class="note" hidden></div>
 <div class="actions"><button id="firebaseSignIn" type="button">Iniciar sesión con Google</button><button id="firebaseSignOut" class="secondary" type="button" hidden>Cerrar sesión</button><button id="firebaseCopyUid" class="secondary" type="button" hidden>Copiar UID</button></div>
+<div class="actions"><button type="button" id="firebaseUpload" hidden>Sincronizar con VidGuard</button><button type="button" class="secondary" id="firebaseDownload" hidden>Consultar historial en Firebase</button></div>
+<p id="firebaseSyncStatus" class="footer" role="status">Sin sincronizar.</p>
 </section>
 <section class="card" id="vidguardIntegration">
 <h2>Integración con VidGuard</h2>
@@ -419,11 +421,22 @@ $('exportVidguard').addEventListener('click',()=>{
  a.download='vidguard-aplicaciones.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  journalMsg('Exportación de '+applications.length+' aplicaciones para VidGuard.');
 });
+window.SFEJournal={
+ list:()=>journal.map(a=>({...a,doseBasisLiters:10,products:(a.products||[]).map(p=>({...p,dosePer10Liters:dosePer10(p.amount,a.waterLiters)}))})),
+ merge:(incoming)=>{
+  const old=journal.slice();const byId=new Map(journal.map(a=>[a.id,a]));
+  let added=0;
+  incoming.forEach(a=>{if(!byId.has(a.id)){byId.set(a.id,a);added++;}});
+  journal=[...byId.values()];if(!writeJournal()){journal=old;throw Error('No se pudo guardar el historial descargado en este navegador.');}
+  renderJournal();return added;
+ }
+};
 readJournal();resetApplication();renderJournal();
 </script>
 
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {getDatabase,ref,get,update} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getAuth,GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,getRedirectResult,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 const config={
  apiKey:"AIzaSyClcnr9ca-gawV0H9IQwUgpV_FlLTlw114",
@@ -435,16 +448,24 @@ const config={
 const el=id=>document.getElementById(id);
 const status=message=>{el('firebaseAuthStatus').textContent=message;};
 try{
- const auth=getAuth(initializeApp(config));
+ const app=initializeApp(config);
+ const auth=getAuth(app);
+ const db=getDatabase(app);
+ const allowedUid='ZPfjgbiFq0d8inDOhYEEMQzM6Zg2';
+ const syncStatus=m=>{el('firebaseSyncStatus').textContent=m;};
+ const authorized=()=>auth.currentUser&&auth.currentUser.uid===allowedUid;
  const provider=new GoogleAuthProvider();
  onAuthStateChanged(auth,user=>{
   el('firebaseSignIn').hidden=!!user;
   el('firebaseSignOut').hidden=!user;
   el('firebaseCopyUid').hidden=!user;
+  el('firebaseUpload').hidden=!user||user.uid!==allowedUid;
+  el('firebaseDownload').hidden=!user||user.uid!==allowedUid;
+  if(user&&user.uid!==allowedUid)syncStatus('Este usuario no está autorizado para sincronizar aplicaciones.');
   el('firebaseUserInfo').hidden=!user;
   if(user){
    el('firebaseUserInfo').textContent='Cuenta: '+(user.email||'Google')+' | UID: '+user.uid;
-   status('Sesión iniciada. Falta habilitar sincronización segura.');
+   status('Sesión iniciada en Firebase.');
   }else status('Sin iniciar sesión. Las aplicaciones siguen guardadas localmente.');
  });
  el('firebaseSignIn').addEventListener('click',async()=>{
@@ -461,6 +482,39 @@ try{
   if(!auth.currentUser)return;
   try{await navigator.clipboard.writeText(auth.currentUser.uid);status('UID copiado. No compartas contraseñas ni tokens.');}
   catch(e){status('No se pudo copiar; seleccioná el UID que aparece arriba.');}
+ });
+
+ el('firebaseUpload').addEventListener('click',async()=>{
+  if(!authorized()){syncStatus('Cuenta no autorizada.');return;}
+  const apps=window.SFEJournal.list();
+  if(!apps.length){syncStatus('Este navegador no tiene aplicaciones. Importá primero el JSON del iPhone con “Importar JSON”.');return;}
+  if(!confirm('Enviar hasta '+apps.length+' aplicaciones locales a tu historial privado de VidGuard? No se reemplazarán registros existentes.'))return;
+  const button=el('firebaseUpload');button.disabled=true;syncStatus('Comprobando registros existentes…');
+  try{
+   const base=ref(db,'applications/'+allowedUid);
+   const snapshot=await get(base),remote=snapshot.val()||{};
+   const pending={};let already=0;
+   for(const a of apps){
+    if(!/^app-[A-Za-z0-9-]+$/.test(a.id))throw Error('ID de aplicación incompatible: '+a.id);
+    if(Object.prototype.hasOwnProperty.call(remote,a.id)){already++;continue;}
+    pending[a.id]=a;
+   }
+   const count=Object.keys(pending).length;
+   if(count)await update(base,pending);
+   syncStatus('Sincronización completada: '+count+' nuevos registros guardados, '+already+' ya existentes. Revisá Firebase → Datos → applications.');
+  }catch(e){syncStatus('Error al sincronizar: '+(e.code||e.message)+'. Los registros locales no fueron borrados.');}
+  finally{button.disabled=false;}
+ });
+ el('firebaseDownload').addEventListener('click',async()=>{
+  if(!authorized()){syncStatus('Cuenta no autorizada.');return;}
+  try{
+   syncStatus('Consultando Firebase…');
+   const snapshot=await get(ref(db,'applications/'+allowedUid));
+   const val=snapshot.val()||{};
+   const records=Object.values(val).filter(a=>a&&typeof a.id==='string'&&Array.isArray(a.products)&&Number(a.waterLiters)>0);
+   const added=window.SFEJournal.merge(records);
+   syncStatus('Firebase: '+records.length+' registros. Incorporados a este navegador: '+added+'. No se sobrescribieron registros locales.');
+  }catch(e){syncStatus('Error al consultar: '+(e.code||e.message));}
  });
  getRedirectResult(auth).catch(e=>status('Error al regresar desde Google: '+(e.code||e.message)));
 }catch(e){status('No se pudo inicializar Firebase: '+e.message);}
