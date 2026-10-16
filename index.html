@@ -35,6 +35,14 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 .record-products input,.record-products select{min-width:0}
 .record-products button{min-width:0;margin:0;padding:0}
 @media(max-width:520px){.record-products{grid-template-columns:minmax(0,1fr) 85px 65px 34px}}
+.history-panel{margin-top:17px}.history-panel summary,.card>details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ececef;border-radius:14px;padding:14px;font-size:16px;font-weight:700}
+.history-panel summary::-webkit-details-marker,.card>details>summary::-webkit-details-marker{display:none}
+.history-panel summary::after,.card>details>summary::after{content:'⌄';font-size:20px;margin-left:auto}
+.history-panel[open] summary::after,.card>details[open]>summary::after{content:'⌃'}
+.history-count{font-size:13px;color:#666;font-weight:600}
+#accountPanel,#vidguardIntegration details{margin:0;border:0;padding:0}
+#accountPanel>summary,#vidguardIntegration summary{margin:0}
+#accountPanel[open]>summary,#vidguardIntegration details[open]>summary{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -138,7 +146,7 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 <section class="card" id="applicationJournal">
 <h2>Cuaderno de aplicaciones</h2>
 <div class="note">Las dosis también se muestran y exportan expresadas <strong>cada 10 L de agua</strong>, como en el cuaderno del ingeniero. Se calculan desde la cantidad total registrada y el agua realmente aplicada.</div>
-<div class="note">Registrá las cantidades <strong>realmente aplicadas</strong>. Este historial se guarda por ahora en este navegador, no en Firebase. Exportá una copia JSON para respaldo.</div>
+<div class="note">Ingresá las cantidades realmente aplicadas. Los registros se conservan en este dispositivo y se sincronizan con Firebase al guardar cuando hay sesión autorizada y conexión.</div>
 <div class="grid grid2" style="margin-top:12px">
 <label>Fecha<input type="date" id="appDate"></label>
 <label>Hora de inicio<input type="time" id="appTime"></label>
@@ -158,29 +166,27 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 <button type="button" class="secondary" id="cancelApplication" hidden>Cancelar edición</button>
 </div>
 <div id="journalMessage" class="footer" role="status" aria-live="polite"></div>
-<h2 style="margin-top:20px">Historial de aplicaciones</h2>
+<details id="applicationHistory" class="history-panel"><summary>📋 Ver historial de aplicaciones <span id="applicationCount" class="history-count"></span></summary>
 <div id="applicationList"><p class="note">Sin aplicaciones registradas en este navegador.</p></div>
 <div class="actions">
 <button type="button" id="exportApplications" class="secondary">Exportar JSON</button>
 <button type="button" id="importApplications" class="secondary">Importar JSON</button>
 </div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
+</details>
 </section>
 
 <section class="card" id="firebaseLogin">
-<h2>Cuenta VidGuard</h2>
+<details id="accountPanel"><summary>☁️ Cuenta y sincronización VidGuard</summary>
 <div class="note">Ingresá con Google para identificar tu usuario de Firebase. Las aplicaciones se guardan localmente y se sincronizan con Firebase al guardar, si iniciás sesión con tu cuenta autorizada. Si no hay conexión, podrás reintentar.</div>
 <p id="firebaseAuthStatus" role="status">Sin iniciar sesión.</p>
 <div id="firebaseUserInfo" class="note" hidden></div>
 <div class="actions"><button id="firebaseSignIn" type="button">Iniciar sesión con Google</button><button id="firebaseSignOut" class="secondary" type="button" hidden>Cerrar sesión</button><button id="firebaseCopyUid" class="secondary" type="button" hidden>Copiar UID</button></div>
 <div class="actions"><button type="button" id="firebaseUpload" hidden>Sincronizar con VidGuard</button><button type="button" class="secondary" id="firebaseDownload" hidden>Consultar historial en Firebase</button></div>
 <p id="firebaseSyncStatus" class="footer" role="status">Sin sincronizar.</p>
+</details>
 </section>
-<section class="card" id="vidguardIntegration">
-<h2>Integración con VidGuard</h2>
-<div class="note">Conservamos tus aplicaciones en este dispositivo. Para transferirlas a VidGuard, generá una copia JSON y luego importala al módulo de aplicaciones. La sincronización automática con Firebase se habilitará cuando configuremos acceso autenticado.</div>
-<button type="button" id="exportVidguard" class="secondary">Exportar para VidGuard</button>
-</section>
+<section class="card" id="vidguardIntegration"><details><summary>⚙️ Respaldo y exportación</summary><p class="note">La sincronización con VidGuard se gestiona desde Cuenta y sincronización. Podés descargar un respaldo JSON cuando quieras.</p><button type="button" id="exportVidguard" class="secondary">Exportar para VidGuard</button></details></section>
 </main>
 
 <script>
@@ -345,6 +351,7 @@ function collectApplication(){
   weatherSnapshot:null,weatherSource:null,createdAt:now,updatedAt:now};
 }
 function renderJournal(){
+ $('applicationCount').textContent='('+journal.length+')';
  const el=$('applicationList');el.replaceChildren();
  if(!journal.length){el.innerHTML='<p class="note">Sin aplicaciones registradas en este navegador.</p>';return;}
  for(const app of [...journal].sort((a,b)=>(b.date||'').localeCompare(a.date||''))){
@@ -372,6 +379,7 @@ function editApplication(id){
  $('appTarget').value=app.target||'';$('appNotes').value=app.notes||'';
  $('appProducts').replaceChildren();(app.products||[]).forEach(addProductRow);
  $('saveApplication').textContent='Actualizar aplicación';$('cancelApplication').hidden=false;
+ $('applicationHistory').open=false;
  $('applicationJournal').scrollIntoView({behavior:'smooth'});journalMsg('Editando aplicación del '+app.date+'.');
 }
 function removeApplication(id){
