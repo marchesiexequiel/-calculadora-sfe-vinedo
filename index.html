@@ -424,12 +424,22 @@ $('exportVidguard').addEventListener('click',()=>{
 });
 window.SFEJournal={
  list:()=>journal.map(a=>({...a,doseBasisLiters:10,products:(a.products||[]).map(p=>({...p,dosePer10Liters:dosePer10(p.amount,a.waterLiters)}))})),
- merge:(incoming)=>{
+ merge:(incoming,pending=[])=>{
   const old=journal.slice();const byId=new Map(journal.map(a=>[a.id,a]));
-  let added=0;
-  incoming.forEach(a=>{if(!byId.has(a.id)){byId.set(a.id,a);added++;}});
-  journal=[...byId.values()];if(!writeJournal()){journal=old;throw Error('No se pudo guardar el historial descargado en este navegador.');}
-  renderJournal();return added;
+  const protectedIds=new Set(pending);
+  let added=0,updated=0,kept=0;
+  incoming.forEach(a=>{
+   const current=byId.get(a.id);
+   if(!current){byId.set(a.id,a);added++;return;}
+   if(protectedIds.has(a.id)){kept++;return;}
+   const remoteTime=Date.parse(a.updatedAt||a.createdAt||'')||0;
+   const localTime=Date.parse(current.updatedAt||current.createdAt||'')||0;
+   if(remoteTime>localTime){byId.set(a.id,a);updated++;}
+   else kept++;
+  });
+  journal=[...byId.values()];
+  if(!writeJournal()){journal=old;throw Error('No se pudo guardar el historial descargado en este navegador.');}
+  renderJournal();return {added,updated,kept};
  }
 };
 readJournal();resetApplication();renderJournal();
@@ -550,8 +560,8 @@ try{
    const snapshot=await get(ref(db,'applications/'+allowedUid));
    const val=snapshot.val()||{};
    const records=Object.values(val).filter(a=>a&&typeof a.id==='string'&&Array.isArray(a.products)&&Number(a.waterLiters)>0);
-   const added=window.SFEJournal.merge(records);
-   syncStatus('Firebase: '+records.length+' registros. Incorporados a este navegador: '+added+'. No se sobrescribieron registros locales.');
+   const result=window.SFEJournal.merge(records,pendingIds());
+   syncStatus('Firebase: '+records.length+' registros. Nuevos: '+result.added+'. Actualizados: '+result.updated+'. Conservados localmente: '+result.kept+'.');
   }catch(e){syncStatus('Error al consultar: '+(e.code||e.message));}
  });
  getRedirectResult(auth).catch(e=>status('Error al regresar desde Google: '+(e.code||e.message)));
