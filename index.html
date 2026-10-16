@@ -43,13 +43,30 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 #accountPanel,#vidguardIntegration details{margin:0;border:0;padding:0}
 #accountPanel>summary,#vidguardIntegration summary{margin:0}
 #accountPanel[open]>summary,#vidguardIntegration details[open]>summary{margin-bottom:12px}
+.app-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;background:#e9e9ed;padding:5px;border-radius:17px;margin-bottom:9px}
+.app-tabs button{font-size:14px;background:transparent;color:#444;margin:0;min-height:43px;border-radius:12px;padding:6px 3px}
+.app-tabs button.active{background:white;color:#111;box-shadow:0 1px 5px #0002}
+.top-actions{display:flex;justify-content:flex-end;margin-bottom:12px}
+.top-actions button{width:auto;min-height:34px;padding:6px 12px;margin:0;font-size:12px}
+.app-page[hidden],#settingsPanel[hidden]{display:none!important}
+#historyCard .history-panel{border:0;padding:0;margin:0}
+#historyCard .history-panel>summary{display:none}
+#historyCard .history-panel{display:block}
+#historyCard .record{margin:12px 0}
+@media(max-width:420px){.app-tabs button{font-size:13px} .top-actions button{font-size:12px}}
 </style>
 </head>
 <body>
 <main>
-<h1>Calculadora fitosanitaria de viñedo</h1>
+<h1>SFE Viñedo</h1>
 
-<section class="card">
+<nav class="app-tabs" aria-label="Secciones SFE Viñedo">
+<button type="button" class="tab active" data-tab="calc" aria-selected="true">Calculadora</button>
+<button type="button" class="tab" data-tab="apply" aria-selected="false">Aplicar</button>
+<button type="button" class="tab" data-tab="history" aria-selected="false">Historial</button>
+</nav>
+<div class="top-actions"><button type="button" class="secondary" id="settingsToggle" aria-expanded="false">⚙ Cuenta y ajustes</button></div>
+<div class="app-page" data-page="calc"><section class="card">
 <div class="grid grid2">
 <label>Sistema de conducción
 <select id="system"><option value="espaldera">Espaldera</option><option value="lira">Lira</option></select>
@@ -143,7 +160,7 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 <div class="footer">Prototipo para revisión técnica. Las dosis precargadas deben verificarse contra el marbete vigente. Versión cálculo tLWA: 2026-10-14.2</div>
 </section>
 
-<section class="card" id="applicationJournal">
+</div><div class="app-page" data-page="apply" hidden><section class="card" id="applicationJournal">
 <h2>Cuaderno de aplicaciones</h2>
 <div class="note">Las dosis también se muestran y exportan expresadas <strong>cada 10 L de agua</strong>, como en el cuaderno del ingeniero. Se calculan desde la cantidad total registrada y el agua realmente aplicada.</div>
 <div class="note">Ingresá las cantidades realmente aplicadas. Los registros se conservan en este dispositivo y se sincronizan con Firebase al guardar cuando hay sesión autorizada y conexión.</div>
@@ -166,17 +183,16 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 <button type="button" class="secondary" id="cancelApplication" hidden>Cancelar edición</button>
 </div>
 <div id="journalMessage" class="footer" role="status" aria-live="polite"></div>
-<details id="applicationHistory" class="history-panel"><summary>📋 Ver historial de aplicaciones <span id="applicationCount" class="history-count"></span></summary>
+</section>
+</div><div class="app-page" data-page="history" hidden><section class="card" id="historyCard"><h2>Historial de aplicaciones <span id="applicationCount" class="history-count"></span></h2><div id="applicationHistory" class="history-panel">
 <div id="applicationList"><p class="note">Sin aplicaciones registradas en este navegador.</p></div>
 <div class="actions">
 <button type="button" id="exportApplications" class="secondary">Exportar JSON</button>
 <button type="button" id="importApplications" class="secondary">Importar JSON</button>
 </div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
-</details>
-</section>
-
-<section class="card" id="firebaseLogin">
+</div>
+</section></div><div id="settingsPanel" hidden><section class="card" id="firebaseLogin">
 <details id="accountPanel"><summary>☁️ Cuenta y sincronización VidGuard</summary>
 <div class="note">Ingresá con Google para identificar tu usuario de Firebase. Las aplicaciones se guardan localmente y se sincronizan con Firebase al guardar, si iniciás sesión con tu cuenta autorizada. Si no hay conexión, podrás reintentar.</div>
 <p id="firebaseAuthStatus" role="status">Sin iniciar sesión.</p>
@@ -187,6 +203,7 @@ button.secondary{background:#ececef;color:#161616}button.danger{background:#f9e6
 </details>
 </section>
 <section class="card" id="vidguardIntegration"><details><summary>⚙️ Respaldo y exportación</summary><p class="note">La sincronización con VidGuard se gestiona desde Cuenta y sincronización. Podés descargar un respaldo JSON cuando quieras.</p><button type="button" id="exportVidguard" class="secondary">Exportar para VidGuard</button></details></section>
+</div>
 </main>
 
 <script>
@@ -379,7 +396,7 @@ function editApplication(id){
  $('appTarget').value=app.target||'';$('appNotes').value=app.notes||'';
  $('appProducts').replaceChildren();(app.products||[]).forEach(addProductRow);
  $('saveApplication').textContent='Actualizar aplicación';$('cancelApplication').hidden=false;
- $('applicationHistory').open=false;
+ window.selectSFETab('apply');
  $('applicationJournal').scrollIntoView({behavior:'smooth'});journalMsg('Editando aplicación del '+app.date+'.');
 }
 function removeApplication(id){
@@ -450,6 +467,21 @@ window.SFEJournal={
   renderJournal();return {added,updated,kept};
  }
 };
+
+function selectSFETab(tab){
+ if(!['calc','apply','history'].includes(tab))return;
+ document.querySelectorAll('[data-page]').forEach(el=>{el.hidden=el.dataset.page!==tab;});
+ document.querySelectorAll('[data-tab]').forEach(btn=>{const active=btn.dataset.tab===tab;btn.classList.toggle('active',active);btn.setAttribute('aria-selected',String(active));});
+ if(tab==='history'&&typeof renderJournal==='function')renderJournal();
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+window.selectSFETab=selectSFETab;
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>selectSFETab(btn.dataset.tab)));
+$('settingsToggle').addEventListener('click',()=>{
+ const p=$('settingsPanel');p.hidden=!p.hidden;
+ $('settingsToggle').setAttribute('aria-expanded',String(!p.hidden));
+ if(!p.hidden){document.getElementById('accountPanel').open=true;p.scrollIntoView({behavior:'smooth'});}
+});
 readJournal();resetApplication();renderJournal();
 </script>
 
