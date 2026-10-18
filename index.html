@@ -328,10 +328,16 @@ function addProductRow(item={}){
  row.innerHTML='<label>Producto<select class="appProd">'+productOptions(item.key||$('preset').value)+'</select></label>'+
  '<label>Cantidad<input class="appQty" type="number" min="0.01" step="any" inputmode="decimal" placeholder="0" value="'+safeText(item.amount??'')+'"></label>'+
  '<label>Unidad<select class="appUnit"><option value="g">g</option><option value="mL">mL</option></select></label>'+
+ '<label>Función sanitaria<select class="appFungicide"><option value="">Según producto precargado</option><option value="yes">Fungicida</option><option value="no">No fungicida</option></select></label>'+
+ '<label class="appCustomWrap" hidden>Nombre del producto<input class="appCustomName" maxlength="130" value="'+safeText(item.customName||'')+'" placeholder="Nombre comercial"></label>'+
  '<button type="button" class="secondary" aria-label="Eliminar producto">×</button>';
  row.querySelector('.appUnit').value=item.unit||products[item.key||$('preset').value].unit;
+ row.querySelector('.appFungicide').value=item.isFungicide===true?'yes':item.isFungicide===false?'no':'';
+ const refreshCustom=()=>{const custom=row.querySelector('.appProd').value==='custom';row.querySelector('.appCustomWrap').hidden=!custom;
+  if(custom&&row.querySelector('.appFungicide').value==='')row.querySelector('.appFungicide').value='yes';};
  row.querySelector('button').addEventListener('click',()=>row.remove());
- row.querySelector('.appProd').addEventListener('change',()=>{row.querySelector('.appUnit').value=products[row.querySelector('.appProd').value].unit;});
+ row.querySelector('.appProd').addEventListener('change',()=>{row.querySelector('.appUnit').value=products[row.querySelector('.appProd').value].unit;refreshCustom();});
+ refreshCustom();
  $('appProducts').append(row);
 }
 function resetApplication(){
@@ -355,7 +361,9 @@ function collectApplication(){
  if(!$('appDate').value||!Number.isFinite(area)||area<=0||!Number.isFinite(water)||water<=0)throw Error('Completá fecha, superficie y agua con valores positivos.');
  const items=[...$('appProducts').children].map(row=>({
   key:row.querySelector('.appProd').value,
-  name:products[row.querySelector('.appProd').value].name,
+  name:row.querySelector('.appProd').value==='custom'?(row.querySelector('.appCustomName').value.trim()||'Otro / personalizado'):products[row.querySelector('.appProd').value].name,
+  customName:row.querySelector('.appProd').value==='custom'?row.querySelector('.appCustomName').value.trim():undefined,
+  isFungicide:row.querySelector('.appFungicide').value==='yes'?true:row.querySelector('.appFungicide').value==='no'?false:undefined,
   amount:Number(row.querySelector('.appQty').value),
   unit:row.querySelector('.appUnit').value
  }));
