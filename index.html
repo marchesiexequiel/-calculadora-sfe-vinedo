@@ -333,7 +333,7 @@ function addProductRow(item={}){
  '<button type="button" class="secondary" aria-label="Eliminar producto">×</button>';
  row.querySelector('.appUnit').value=item.unit||products[item.key||$('preset').value].unit;
  row.querySelector('.appFungicide').value=item.isFungicide===true?'yes':item.isFungicide===false?'no':'';
- const refreshCustom=()=>{const custom=row.querySelector('.appProd').value==='custom';row.querySelector('.appCustomWrap').hidden=!custom;};
+ const refreshCustom=()=>{const custom=row.querySelector('.appProd').value==='custom';row.querySelector('.appCustomWrap').hidden=!custom;row.querySelector('.appCustomWrap').style.display=custom?'':'none';};
  row.querySelector('button').addEventListener('click',()=>row.remove());
  row.querySelector('.appProd').addEventListener('change',()=>{row.querySelector('.appUnit').value=products[row.querySelector('.appProd').value].unit;row.querySelector('.appFungicide').value='';refreshCustom();});
  refreshCustom();
