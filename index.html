@@ -363,8 +363,8 @@ function collectApplication(){
  const items=[...$('appProducts').children].map(row=>({
   key:row.querySelector('.appProd').value,
   name:row.querySelector('.appProd').value==='custom'?(row.querySelector('.appCustomName').value.trim()||'Otro / personalizado'):products[row.querySelector('.appProd').value].name,
-  customName:row.querySelector('.appProd').value==='custom'?row.querySelector('.appCustomName').value.trim():undefined,
-  isFungicide:row.querySelector('.appFungicide').value==='yes'?true:row.querySelector('.appFungicide').value==='no'?false:undefined,
+  ...(row.querySelector('.appProd').value==='custom'?{customName:row.querySelector('.appCustomName').value.trim()}:{}),
+  ...(row.querySelector('.appFungicide').value==='yes'?{isFungicide:true}:row.querySelector('.appFungicide').value==='no'?{isFungicide:false}:{}),
   amount:Number(row.querySelector('.appQty').value),
   unit:row.querySelector('.appUnit').value
  }));
@@ -527,12 +527,14 @@ try{
   catch(e){syncStatus('Guardado remoto confirmado, pero no se pudo actualizar la cola local.');}
  }
  let saving=Promise.resolve();
+ // Firebase rejects undefined nested values in older local journal records.
+ const firebaseSafe=record=>JSON.parse(JSON.stringify(record));
  async function sendRecord(record){
   if(!authorized()){syncStatus('Guardado local. Iniciá sesión con la cuenta autorizada para sincronizar.');return;}
   const id=record.id;
   if(!/^app-[A-Za-z0-9-]+$/.test(id)){syncStatus('ID inválido; guardado solo local.');return;}
   try{
-   await set(ref(db,'applications/'+allowedUid+'/'+id),record);
+   await set(ref(db,'applications/'+allowedUid+'/'+id),firebaseSafe(record));
    clearPending(id);
    syncStatus('Sincronizado en Firebase: '+record.date+' ('+record.products.length+' productos).');
    document.getElementById('journalMessage').textContent='Guardado local y sincronizado con VidGuard.';
@@ -595,7 +597,7 @@ try{
    for(const a of apps){
     if(!/^app-[A-Za-z0-9-]+$/.test(a.id))throw Error('ID de aplicación incompatible: '+a.id);
     if(Object.prototype.hasOwnProperty.call(remote,a.id)&&!pendingIds().includes(a.id)){already++;continue;}
-    pending[a.id]=a;
+    pending[a.id]=firebaseSafe(a);
    }
    const count=Object.keys(pending).length;
    if(count){await update(base,pending);Object.keys(pending).forEach(clearPending);}
